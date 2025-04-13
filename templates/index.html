@@ -188,6 +188,25 @@
     .openPopup();
 </script>
 
+<script>
+  function updateGPSMarker() {
+    fetch('/gps_data')
+      .then(response => response.json())
+      .then(data => {
+        const lat = data.latitude;
+        const lon = data.longitude;
+
+        marker.setLatLng([lat, lon])
+              .bindPopup(`${lat.toFixed(6)}, ${lon.toFixed(6)}`)
+              .openPopup();
+
+        map.setView([lat, lon], map.getZoom()); // Optional: recenter map
+      })
+      .catch(err => console.error("Failed to fetch GPS data:", err));
+  }
+
+  setInterval(updateGPSMarker, 2000); // Update every 2 seconds
+</script>
 
 
 <script>
