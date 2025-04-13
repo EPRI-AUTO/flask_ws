@@ -1,0 +1,188 @@
+from flask import Flask, render_template, redirect, url_for, jsonify, Response
+from flask_socketio import SocketIO
+from std_msgs.msg import Int32, String, Float32
+import rclpy
+from rclpy.node import Node
+import subprocess
+import cv2
+import numpy as np
+import threading
+import time
+import atexit
+import signal
+import os
+
+app = Flask(__name__)
+
+# Use a flag to simulate local testing
+IS_LOCAL = False  # Set to False when running on the Jetson
+
+class StatusPublisher(Node):
+    def __init__(self):
+        super().__init__('status_publisher')
+        self.publisher = self.create_publisher(String, '/robot_status', 10)
+
+    def publish_status(self, message):
+        msg = String()
+        msg.data = message
+        self.publisher.publish(msg)
+        self.get_logger().info(f'Status Updated: {message}')
+
+# Camera section
+# Global video capture objects for two cameras
+# Front camera stream from ZED 2i
+
+front_camera = cv2.VideoCapture('/dev/video0')
+back_camera = cv2.VideoCapture('/dev/video2')
+print("Front camera opened:", front_camera.isOpened())
+print("Back camera opened:", back_camera.isOpened())
+
+def generate_feed(camera):
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+                # Crop only the left half (adjust if needed)
+        width = frame.shape[1] // 2
+        height = frame.shape[0]
+        left_frame = frame[0:height, 0:width]  # Crop left half
+
+        # Optional: resize for web display
+        resized = cv2.resize(left_frame, (400, 300))
+
+        _, buffer = cv2.imencode('.jpg', resized)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+# Cleanup on exit
+@atexit.register
+def cleanup():
+    front_camera.release()
+    back_camera.release()
+
+@app.route('/video_feed/front')
+def video_feed_front():
+    if IS_LOCAL:
+        return redirect(url_for('static', filename='placeholder.jpg'))
+    else:
+        return Response(generate_feed(front_camera),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/video_feed/back')
+def video_feed_back():
+    if IS_LOCAL:
+        return redirect(url_for('static', filename='placeholder.jpg'))
+    else:
+        return Response(generate_feed(back_camera),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+ # Battery section 
+
+# Battery Section
+battery_percentage_value = 0
+class BatteryListener(Node):
+    def __init__(self):
+        super().__init__('battery_listener')
+        self.subscription = self.create_subscription(
+            Int32,
+            '/battery_percentage',
+            self.listener_callback,
+            10
+        )
+
+    def listener_callback(self, msg):
+        global battery_percentage_value
+        battery_percentage_value = msg.data
+
+
+
+# Message output section
+robot_status_message = "Current Mode: Idle"
+class StatusListener(Node):
+    def __init__(self):
+        super().__init__('status_listener')
+        self.subscription = self.create_subscription(
+            String,
+            '/robot_status',
+            self.listener_callback,
+            10
+        )
+
+    def listener_callback(self, msg):
+        global robot_status_message
+        robot_status_message = msg.data
+
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route('/run_lidar')
+def run_lidar():
+    command = "cd && /usr/local/bin/init_lidar.sh"
+    subprocess.Popen(["bash", "-c", command])  # Don't block Flask
+    return redirect(url_for('home'))
+
+@app.route('/run_robot')
+def run_robot():
+    command = "cd && /usr/local/bin/run_all.sh"
+    subprocess.Popen(["bash", "-c", command])  # Don't block Flask
+
+    return redirect(url_for('home'))
+
+@app.route('/manual_mode')
+def manual_mode():
+    command = "cd && /usr/local/bin/manual_motor.sh"
+    subprocess.Popen(["bash", "-c", command])  # Don't block Flask
+
+    return redirect(url_for('home'))
+
+@app.route('/emergency_stop')
+def emergency_stop():
+
+    os.system("pkill -f terminator")
+
+    return jsonify({"status": "Emergency stop: All terminals closed."})
+
+
+#Battery reading section
+@app.route('/battery_percentage')
+def battery_percentage():
+    return {"percentage": battery_percentage_value}
+
+# Message output section
+@app.route('/robot_status')
+def robot_status():
+    return {"status": robot_status_message}
+
+# @app.route('/lidar_map')
+# def lidar_map():
+#     # For now, we use a placeholder image for the LiDAR map
+#     # Replace this with your actual LiDAR map generation code
+#     return redirect(url_for('static', filename='lidar_placeholder.jpg'))
+
+# Start ROS2 node
+def start_ros2_node():
+     rclpy.init()
+     battery_node = BatteryListener()
+     status_publish = StatusPublisher()
+     status_node = StatusListener()
+
+     def spin():
+        rclpy.spin(battery_node)
+        rclpy.spin(status_node)
+        rclpy.spin(status_publish)
+        battery_node.destroy_node()
+        status_node.destroy_node()
+        status_publish.destroy_node()
+        rclpy.shutdown()
+
+     thread = threading.Thread(target=spin, daemon=True)
+     thread.start()
+
+
+if __name__ == '__main__':
+    start_ros2_node()
+    app.run(host='0.0.0.0')

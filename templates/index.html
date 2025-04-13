@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SeekurJr</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"/>
+
+  <style>
+    body {
+      background-color: #88adce; /* Light blue background */
+    }
+
+    .container {
+      margin-top: 20px;
+    }
+
+    .video-feed {
+      border: 2px solid #ddd;
+      padding: 10px;
+      background-color: #fff;
+      height: 275px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-feed img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .lidar-map {
+      border: 2px solid #ddd;
+      padding: 5px;
+      background-color: #fff;
+      height: 375px;
+      margin-top: 20px;
+    }
+
+    .button-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      height: 100%;
+      padding-left: 20px;
+    }
+
+    .button-box form {
+      margin-bottom: 15px;
+    }
+
+    .button-box button {
+      width: 160px;
+    }
+  </style>
+</head>
+<body>
+  <div id="battery-container" style="position: absolute; top: 10px; right: 200px; background: #fff; padding: 10px 15px; border-radius: 8px; font-weight: bold; box-shadow: 0px 0px 5px rgba(0,0,0,0.2);">
+    Battery: <span id="battery-percentage">--%</span>
+  </div>  
+  <div id="status-box" style="position: absolute; top: 90px; right: 200px; background: #fff; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 250px; text-align: center; box-shadow: 0px 0px 5px rgba(0,0,0,0.2);">
+    <h5>Status:</h5>
+    <p id="robot-status">Waiting for updates...</p>
+  </div>  
+  <div class="container">
+    <h1 class="text-center mb-4">Robot Controls</h1>
+    <div class="row">
+      <!-- Left Section: Video Feeds and LiDAR Map -->
+      <div class="col-md-9">
+        <div class="row">
+          <!-- Camera Feeds Side by Side -->
+          <div class="col-md-6">
+            <div class="video-feed">
+              <h5>Front Camera</h5>
+              <img src="{{ url_for('video_feed_front') }}" alt="Front Camera Feed"/>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="video-feed">
+              <h5>Back Camera</h5>
+              <img src="{{ url_for('video_feed_back') }}" alt="Back Camera Feed"/>
+            </div>
+          </div>
+        </div>
+
+  <!-- LiDAR Map Below Camera Feeds -->
+<!-- Map and Controls Side by Side -->
+<div class="row mt-4">
+  <div class="col-md-9">
+    <div id="map" class="lidar-map">
+      <h5>GPS Location</h5>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="button-box">
+      <form action="/run_lidar" method="get">
+        <button class="btn btn-primary btn-block mb-2" type="submit">Initialize LiDAR</button>
+      </form>
+
+      <form action="/run_robot" method="get">
+        <button class="btn btn-success btn-block mb-2" type="submit">Start Robot</button>
+      </form>
+
+      <form action="/manual_mode" method="get">
+        <button class="btn btn-warning btn-block" type="submit">Manual Only Mode</button>
+      </form>
+
+      <form id="stop-form">
+        <button class="btn btn-danger" type="button" onclick="sendEmergencyStop()">EMERGENCY STOP</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Bootstrap JS -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+  <script>
+    function fetchBattery() {
+      fetch('/battery_percentage')
+        .then(response => response.json())
+        .then(data => {
+          const percentage = Math.round(data.percentage);
+          document.getElementById('battery-percentage').textContent = `${percentage}%`;
+        })
+        .catch(err => console.error('Failed to fetch battery percentage:', err));
+    }
+  
+    // Fetch every 5 seconds
+    setInterval(fetchBattery, 5000);
+    fetchBattery(); // Initial load
+  </script>
+  <script>
+    function fetchStatus() {
+      fetch('/robot_status')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('robot-status').textContent = data.status;
+        })
+        .catch(err => console.error('Failed to fetch robot status:', err));
+    }
+  
+    // Fetch status every 3 seconds
+    setInterval(fetchStatus, 3000);
+    fetchStatus(); // Initial load
+
+    function sendEmergencyStop() {
+    fetch('/emergency_stop', { method: 'POST' })
+      .then(response => response.json())
+      .then(data => {
+        // Update the status on the page after emergency stop
+        document.getElementById('robot-status').textContent = data.status;
+      })
+      .catch(err => console.error("Failed to send emergency stop:", err));
+  }
+  </script>
+  <!-- Leaflet JS & CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+  // Create a custom icon
+  var customIcon = L.icon({
+    iconUrl: "{{ url_for('static', filename='seekur_pin.png') }}", // Correct path to your custom pin image
+    iconSize: [32, 32],  // Size of the icon
+    iconAnchor: [16, 32], // Point of the icon which will correspond to the marker's location
+    popupAnchor: [0, -32] // Point from which the popup will open relative to the iconAnchor
+  });
+
+  // Create map and add it
+  var map = L.map('map').setView([35.307594, -80.731187], 20); // Centered on North Carolina
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles © Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+}).addTo(map);
+
+
+  // Example marker with custom icon for the robot's GPS location
+  var marker = L.marker([35.307594, -80.731187], { icon: customIcon }).addTo(map)
+    .bindPopup("35.307594, -80.731187")
+    .openPopup();
+</script>
+
+
+
+<script>
+  function sendEmergencyStop() {
+    fetch('/emergency_stop', { method: 'POST' })
+      .then(response => response.text())
+      .then(data => console.log(data))
+      .catch(err => console.error("Failed to send emergency stop:", err));
+  }
+  </script>
+
+  
+</body>
+</html>
