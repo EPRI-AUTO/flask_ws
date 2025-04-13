@@ -1,6 +1,7 @@
 from flask import Flask, render_template, redirect, url_for, jsonify, Response
 from flask_socketio import SocketIO
 from std_msgs.msg import Int32, String, Float32
+from sensor_msgs.msg import NavSatFix
 import rclpy
 from rclpy.node import Node
 import subprocess
@@ -16,6 +17,7 @@ app = Flask(__name__)
 
 # Use a flag to simulate local testing
 IS_LOCAL = False  # Set to False when running on the Jetson
+gps_data = {"latitude": 0.0, "longitude": 0.0}
 
 class StatusPublisher(Node):
     def __init__(self):
@@ -76,9 +78,22 @@ def video_feed_back():
     else:
         return Response(generate_feed(back_camera),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+# GPS Section
+class GPSListener(Node):
+    def __init__(self):
+        super().__init__('gps_listener')
+        self.subscription = self.create_subscription(
+            NavSatFix,
+            '/gps_data',  # or your actual GPS topic
+            self.listener_callback,
+            10
+        )
 
-
- # Battery section 
+    def listener_callback(self, msg):
+        global gps_data
+        gps_data["latitude"] = msg.latitude
+        gps_data["longitude"] = msg.longitude
 
 # Battery Section
 battery_percentage_value = 0
@@ -125,6 +140,10 @@ def run_lidar():
     subprocess.Popen(["bash", "-c", command])  # Don't block Flask
     return redirect(url_for('home'))
 
+@app.route('/gps_data')
+def gps_data_endpoint():
+    return jsonify(gps_data)
+
 @app.route('/run_robot')
 def run_robot():
     command = "cd && /usr/local/bin/run_all.sh"
@@ -169,14 +188,17 @@ def start_ros2_node():
      battery_node = BatteryListener()
      status_publish = StatusPublisher()
      status_node = StatusListener()
+     gps_node = GPSListener()
 
      def spin():
         rclpy.spin(battery_node)
         rclpy.spin(status_node)
         rclpy.spin(status_publish)
+        rclpy.spin(gps_node)
         battery_node.destroy_node()
         status_node.destroy_node()
         status_publish.destroy_node()
+        gps_node
         rclpy.shutdown()
 
      thread = threading.Thread(target=spin, daemon=True)
