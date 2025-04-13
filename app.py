@@ -4,6 +4,7 @@ from std_msgs.msg import Int32, String, Float32
 from sensor_msgs.msg import NavSatFix
 import rclpy
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 import subprocess
 import cv2
 import numpy as np
@@ -85,7 +86,7 @@ class GPSListener(Node):
         super().__init__('gps_listener')
         self.subscription = self.create_subscription(
             NavSatFix,
-            '/gps_data',  # or your actual GPS topic
+            '/gps_data',
             self.listener_callback,
             10
         )
@@ -190,15 +191,18 @@ def start_ros2_node():
      status_node = StatusListener()
      gps_node = GPSListener()
 
+     executor = MultiThreadedExecutor()
+     executor.add_node(battery_node)
+     executor.add_node(status_publish)
+     executor.add_node(status_node)
+     executor.add_node(gps_node)
+
      def spin():
-        rclpy.spin(battery_node)
-        rclpy.spin(status_node)
-        rclpy.spin(status_publish)
-        rclpy.spin(gps_node)
+        executor.spin()
         battery_node.destroy_node()
         status_node.destroy_node()
         status_publish.destroy_node()
-        gps_node
+        gps_node.destroy_node()
         rclpy.shutdown()
 
      thread = threading.Thread(target=spin, daemon=True)
