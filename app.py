@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, jsonify, Response
+from flask import Flask, render_template, redirect, url_for, jsonify, request, Response
 from flask_socketio import SocketIO
 from std_msgs.msg import Int32, String, Float32
 from sensor_msgs.msg import NavSatFix
@@ -19,6 +19,7 @@ app = Flask(__name__)
 # Use a flag to simulate local testing
 IS_LOCAL = False  # Set to False when running on the Jetson
 gps_data = {"latitude": 0.0, "longitude": 0.0}
+geofence_data = []
 
 class StatusPublisher(Node):
     def __init__(self):
@@ -95,6 +96,27 @@ class GPSListener(Node):
         global gps_data
         gps_data["latitude"] = msg.latitude
         gps_data["longitude"] = msg.longitude
+
+# Geofence drawing
+@app.route('/save_geofence', methods=['POST'])
+def save_geofence():
+    global geofence_data
+    geofence_data = request.json.get('points', [])
+    print("Received geofence:", geofence_data)
+    return jsonify({"status": "success", "points": geofence_data})
+
+# Clear geofence
+@app.route('/clear_geofence', methods=['POST'])
+def clear_geofence():
+    global geofence_data
+    geofence_data = []
+    # Also delete the saved file if you're using persistent storage
+    import os
+    try:
+        os.remove('geofence.json')
+    except FileNotFoundError:
+        pass
+    return jsonify({"message": "Geofence cleared"})
 
 # Battery Section
 battery_percentage_value = 0

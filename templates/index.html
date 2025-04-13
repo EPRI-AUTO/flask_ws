@@ -113,6 +113,8 @@
       <form id="stop-form">
         <button class="btn btn-danger" type="button" onclick="sendEmergencyStop()">EMERGENCY STOP</button>
       </form>
+
+      <button onclick="clearGeofence()" style="position:absolute; top:10px; right:10px; z-index:1000;">Clear Geofence</button>
     </div>
   </div>
 </div>
@@ -208,6 +210,53 @@
   setInterval(updateGPSMarker, 2000); // Update every 2 seconds
 </script>
 
+<script>
+  let geofencePoints = [];
+  let geofencePolygon = null;
+  let geofenceMarkers = [];
+
+
+  function onMapClick(e) {
+  if (geofencePoints.length < 4) {
+    geofencePoints.push([e.latlng.lat, e.latlng.lng]);
+    const marker = L.marker(e.latlng).addTo(map);
+    geofenceMarkers.push(marker);
+
+    if (geofencePoints.length === 4) {
+      geofencePolygon = L.polygon(geofencePoints, {color: 'red'}).addTo(map);
+
+      fetch('/save_geofence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points: geofencePoints })
+      })
+      .then(response => response.json())
+      .then(data => console.log("Saved geofence:", data))
+      .catch(err => console.error("Error saving geofence:", err));
+    }
+  }
+}
+
+  map.on('click', onMapClick);
+</script>
+
+<script>
+function clearGeofence() {
+  fetch('/clear_geofence', { method: 'POST' })
+    .then(res => res.json())
+    .then(data => {
+      console.log(data.message);
+      if (geofencePolygon) {
+        map.removeLayer(geofencePolygon);
+        geofencePolygon = null;
+        geofencePoints = [];
+      }
+      geofenceMarkers.forEach(marker => map.removeLayer(marker));
+      geofenceMarkers = [];
+    })
+    .catch(err => console.error("Failed to clear geofence:", err));
+}
+</script>
 
 <script>
   function sendEmergencyStop() {
