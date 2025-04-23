@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SeekurJr</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+/* General Styles */
+body {
+  background-color: #f5f5f5;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+}
+
+.logos img {
+  max-height: 45px; 
+}
+
+h1 {
+  font-size: 1.4rem;  
+}
+
+.video-feed {
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0;  
+  margin: 0 auto 1rem auto;
+  width: 100%;
+  height: 275px; 
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-feed img {
+  width: 100%;
+  height: 100%;
+  object-fit: fill; 
+}
+
+
+.map {
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px;  
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+#map {
+  width: 100%;
+  height: 180px;
+}
+
+.button-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;  
+  margin-top: 10px;
+}
+
+
+button {
+  padding: 6px 14px;  
+  font-size: 13px; 
+  width: 100%;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  border: none;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button.btn-primary {
+  background-color: #0968ce;
+  color: white;
+}
+
+button.btn-primary:hover {
+  background-color: #003399;
+}
+
+button.btn-success {
+  background-color: #0968ce;
+  color: white;
+}
+
+button.btn-success:hover {
+  background-color: #003399;
+}
+
+button.btn-warning {
+  background-color: #0968ce;
+  color: white;
+}
+
+button.btn-warning:hover {
+  background-color: #003399;
+}
+
+button.emergency-stop {
+  background-color:rgb(223, 21, 41);
+  color: white;
+}
+
+button.emergency-stop:hover {
+  background-color:rgb(182, 2, 20);
+}
+
+button.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+button.btn-secondary:hover {
+  background-color: #5a6268;
+}
+
+button.btn-info {
+  background-color: #6c757d;
+  color: white;
+}
+
+button.btn-info:hover {
+  background-color: #6c757d;
+}
+
+/* Responsive Styles */
+@media (max-width: 768px) {
+  .logos {
+    flex-direction: column;
+    gap: 8px; 
+  }
+
+  #battery-container,
+  #status-box {
+    position: relative;
+    top: auto;
+    right: auto;
+    margin-left: 15px;
+  }
+
+  .video-feed img {
+    max-height: 190px;  
+  }
+
+  #map {
+    height: 150px;  
+  }
+
+  .button-box button {
+    font-size: 12px; 
+    padding: 5px 12px; 
+  }
+}
+
+
+
+  </style>
+</head>
+<body>
+  <div class="container-fluid bg-white py-2 shadow-sm">
+    <div class="d-flex justify-content-between align-items-center">
+      <img src="{{ url_for('static', filename='epri_logo.png') }}" alt="Logo 1" style="max-height: 60px;">
+      <img src="{{ url_for('static', filename='uncc_logo.png') }}" alt="Logo 2" style="max-height: 60px;">
+      <h1 class="text-center flex-grow-1 mb-0" style="font-size: 1.6rem;">EPRI Autonomous Exploration Robot</h1>
+      <h5 id="robot-status" style="margin-right: 10px;">Waiting for updates...</h5>
+      <h5>Battery: <span id="battery-percentage">--%</span></h5>
+    </div>
+  </div>
+<div class="container-fluid mt-3">
+  <div class="row">
+    <div class="col-md-6">
+      <div class="video-feed">
+        <h5 class="text-center">Front Camera</h5>
+        <!-- <img src="{{ url_for('static', filename='Front_cam.png') }}" alt="Front Camera Feed"/> Only for use with no camera feed (placeholder)-->
+        <img src="{{ url_for('video_feed_front') }}" alt="Front Camera Feed"/>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="video-feed">
+        <h5 class="text-center">Back Camera</h5>
+        <!-- <img src="{{ url_for('static', filename='Back_cam.png') }}" alt="Back Camera Feed"/> -->
+        <img src="{{ url_for('video_feed_back') }}" alt="back Camera Feed"/>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-3">
+    <div class="col-md-8">
+      <div class="map p-2">
+        <h5 class="text-center mb-2">GPS Location</h5>
+        <div id="map" style="height: 250px;"></div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="button-box">
+        <form action="/run_lidar" method="get">
+          <button class="btn btn-primary btn-block mb-2" type="submit">Initialize LiDAR</button>
+        </form>
+
+        <form action="/run_robot" method="get">
+          <button class="btn btn-success btn-block mb-2" type="submit">Start Robot</button>
+        </form>
+
+        <form action="/manual_mode" method="get">
+          <button class="btn btn-warning btn-block" type="submit">Manual Only Mode</button>
+        </form>
+
+        <form action="/emergency_stop" method="get">
+          <button class="btn emergency-stop btn-block" type="submit">EMERGENCY STOP</button>
+        </form>
+
+        <button onclick="clearGeofence()" class="btn btn-secondary btn-block mt-2" type="button">Clear Geofence</button>
+        <button onclick="loadGeofence()" class="btn btn-info btn-block mt-2" type="button">Load Geofence</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Bootstrap + Leaflet Scripts -->
+  <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/leaflet.css') }}">
+  <script src="{{ url_for('static', filename='js/leaflet.js') }}"></script>
+  
+  
+
+  <script>
+    function fetchBattery() {
+      fetch('/battery_percentage')
+        .then(response => response.json())
+        .then(data => {
+          const percentage = Math.round(data.percentage);
+          document.getElementById('battery-percentage').textContent = `${percentage}%`;
+        })
+        .catch(err => console.error('Failed to fetch battery percentage:', err));
+    }
+
+    function fetchStatus() {
+      fetch('/robot_status')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('robot-status').textContent = data.status;
+        })
+        .catch(err => console.error('Failed to fetch robot status:', err));
+    }
+
+    setInterval(fetchBattery, 5000);
+    setInterval(fetchStatus, 3000);
+    fetchBattery();
+    fetchStatus();
+
+    var customIcon = L.icon({
+      iconUrl: "{{ url_for('static', filename='seekur_pin.png') }}",
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32]
+    });
+
+    var geofenceIcon = L.icon({
+      iconUrl: "{{ url_for('static', filename='images/marker-icon.png') }}",
+      iconSize: [32, 32],  
+      iconAnchor: [16, 32], 
+      popupAnchor: [0, -32]  
+    });
+
+
+    var map = L.map('map', {
+    center: [35.307594, -80.731187],
+    zoom: 20,
+    minZoom: 1,
+    maxZoom: 20,
+    zoomControl: true
+});
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    maxZoom: 20
+  }).addTo(map);
+
+  var marker = L.marker([35.307594, -80.731187], { icon: customIcon }).addTo(map)
+
+    function updateGPSMarker() {
+      fetch('/gps_data')
+        .then(response => response.json())
+        .then(data => {
+          const lat = data.latitude;
+          const lon = data.longitude;
+
+          marker.setLatLng([lat, lon]);
+
+          map.setView([lat, lon], map.getZoom());
+        })
+        .catch(err => console.error("Failed to fetch GPS data:", err));
+    }
+
+    setInterval(updateGPSMarker, 2000);
+
+    let geofencePoints = [];
+    let geofencePolygon = null;
+    let geofenceMarkers = [];
+
+    function onMapClick(e) {
+      if (geofencePoints.length < 4) {
+        geofencePoints.push([e.latlng.lat, e.latlng.lng]);
+        const marker = L.marker(e.latlng, { icon: geofenceIcon }).addTo(map);
+        geofenceMarkers.push(marker);
+
+        if (geofencePoints.length === 4) {
+          geofencePolygon = L.polygon(geofencePoints, {color: 'red'}).addTo(map);
+          fetch('/save_geofence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ points: geofencePoints })
+          })
+          .then(response => response.json())
+          .then(data => console.log("Saved geofence:", data))
+          .catch(err => console.error("Error saving geofence:", err));
+        }
+      }
+    }
+
+    function clearGeofence() {
+      fetch('/clear_geofence', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          console.log(data.message);
+          if (geofencePolygon) {
+            map.removeLayer(geofencePolygon);
+            geofencePolygon = null;
+            geofencePoints = [];
+          }
+          geofenceMarkers.forEach(marker => map.removeLayer(marker));
+          geofenceMarkers = [];
+        })
+        .catch(err => console.error("Failed to clear geofence:", err));
+    }
+
+    function loadGeofence() {
+  fetch('/load_geofence')
+    .then(response => {
+      if (!response.ok) throw new Error("Failed to load geofence");
+      return response.json();
+    })
+    .then(data => {
+      console.log("Loaded geofence data:", data);
+
+      if (data.geofence && Array.isArray(data.geofence)) {
+        // Clear existing polygon/markers if needed
+        if (geofencePolygon) {
+          map.removeLayer(geofencePolygon);
+        }
+        geofenceMarkers.forEach(marker => map.removeLayer(marker));
+        geofenceMarkers = [];
+
+        // Draw markers and polygon
+        geofencePolygon = L.polygon(data.geofence, { color: 'red' }).addTo(map);
+        data.geofence.forEach(point => {
+          const marker = L.marker(point, { icon: geofenceIcon }).addTo(map);
+          geofenceMarkers.push(marker);
+        });
+
+        // Optional: zoom to fit the geofence
+        map.fitBounds(geofencePolygon.getBounds());
+      } else {
+        console.warn("Invalid geofence data format");
+      }
+    })
+    .catch(err => {
+      console.error("Error loading geofence:", err);
+      alert("Error loading geofence.");
+    });
+}
+
+
+    map.on('click', onMapClick);
+  </script>
+
+</body>
+</html>
