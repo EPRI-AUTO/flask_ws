@@ -17,11 +17,12 @@ import yaml
 
 app = Flask(__name__)
 
-# Use a flag to simulate local testing
-IS_LOCAL = False  # Set to False when running on the Jetson
+# Global Variable setup
+IS_LOCAL = False  # Set to True for local testing of code
 gps_data = {"latitude": 35.307594, "longitude": -80.731187}
 geofence_data = []
 
+# Creation of publisher for status updates
 class StatusPublisher(Node):
     def __init__(self):
         super().__init__('status_publisher')
@@ -34,9 +35,6 @@ class StatusPublisher(Node):
         self.get_logger().info(f'Status Updated: {message}')
 
 # Camera section
-# Global video capture objects for two cameras
-# Front camera stream from ZED 2i
-
 front_camera = cv2.VideoCapture('/dev/video0')
 back_camera = cv2.VideoCapture('/dev/video2')
 print("Front camera opened:", front_camera.isOpened())
@@ -66,6 +64,7 @@ def cleanup():
     front_camera.release()
     back_camera.release()
 
+# Routing for Flask app functions for front and back camera feeds, uses placeholder images if local testing
 @app.route('/video_feed/front')
 def video_feed_front():
     if IS_LOCAL:
@@ -83,6 +82,8 @@ def video_feed_back():
                         mimetype='multipart/x-mixed-replace; boundary=frame')
     
 # GPS Section
+
+# Listens for GPS data from ROS2 publisher and updates coordinate variable
 class GPSListener(Node):
     def __init__(self):
         super().__init__('gps_listener')
@@ -141,7 +142,6 @@ def get_geofence():
 def clear_geofence():
     global geofence_data
     geofence_data = []
-    # Also delete the saved file if you're using persistent storage
     import os
     try:
         os.remove('geofence.json')
@@ -150,7 +150,9 @@ def clear_geofence():
     return jsonify({"message": "Geofence cleared"})
 
 # Battery Section
-battery_percentage_value = 100
+battery_percentage_value = 0 # Default value for battery percentage
+
+# Listens for updates from battery percentage publisher and updates frequently
 class BatteryListener(Node):
     def __init__(self):
         super().__init__('battery_listener')
@@ -166,8 +168,10 @@ class BatteryListener(Node):
         battery_percentage_value = msg.data
 
 
-# Message output section
-robot_status_message = "Current Mode: Idle"
+# Status update section
+robot_status_message = "Current Mode: Idle" #Default robot status
+
+# Listens for robot status updates from ROS2 publisher
 class StatusListener(Node):
     def __init__(self):
         super().__init__('status_listener')
@@ -182,11 +186,12 @@ class StatusListener(Node):
         global robot_status_message
         robot_status_message = msg.data
 
-
+# Default home routing for webpage
 @app.route("/")
 def home():
     return render_template("index.html")
 
+# Gneral routing for button functions and updating readouts
 @app.route('/run_lidar')
 def run_lidar():
     command = "cd && /usr/local/bin/init_lidar.sh"
@@ -213,11 +218,9 @@ def manual_mode():
 
 @app.route('/emergency_stop')
 def emergency_stop():
-
-    os.system("pkill -f terminator")
-
-    return jsonify({"status": "Emergency stop: All terminals closed."})
-
+    global status_publish_node
+    status_publish_node.publish_status("Current Status: Emergency Stop")
+    return redirect(url_for('home'))
 
 #Battery reading section
 @app.route('/battery_percentage')
@@ -229,17 +232,18 @@ def battery_percentage():
 def robot_status():
     return {"status": robot_status_message}
 
-# Start ROS2 node
+# Start ROS2 nodes in a multithreaded executor
 def start_ros2_node():
      rclpy.init()
      battery_node = BatteryListener()
-     status_publish = StatusPublisher()
+     global status_publish_node
+     status_publish_node = StatusPublisher()
      status_node = StatusListener()
      gps_node = GPSListener()
 
      executor = MultiThreadedExecutor()
      executor.add_node(battery_node)
-     executor.add_node(status_publish)
+     executor.add_node(status_publish_node)
      executor.add_node(status_node)
      executor.add_node(gps_node)
 
@@ -247,14 +251,14 @@ def start_ros2_node():
         executor.spin()
         battery_node.destroy_node()
         status_node.destroy_node()
-        status_publish.destroy_node()
+        status_publish_node.destroy_node()
         gps_node.destroy_node()
         rclpy.shutdown()
 
      thread = threading.Thread(target=spin, daemon=True)
      thread.start()
 
-
+# Runs node starting function, sets IP assignment for connection, can be changed to 0.0.0.0 for auto-assigning an IP
 if __name__ == '__main__':
     start_ros2_node()
     app.run(host='192.168.1.101')
