@@ -133,7 +133,7 @@ button.btn-info:hover {
   background-color: #6c757d;
 }
 
-/* Responsive Styles */
+/* Responsive Styles for use on mobile devices */
 @media (max-width: 768px) {
   .logos {
     flex-direction: column;
@@ -166,7 +166,7 @@ button.btn-info:hover {
 
   </style>
 </head>
-<body>
+<body>   <!-- Logo, header, status, and battery visuals section -->
   <div class="container-fluid bg-white py-2 shadow-sm">
     <div class="d-flex justify-content-between align-items-center">
       <img src="{{ url_for('static', filename='epri_logo.png') }}" alt="Logo 1" style="max-height: 60px;">
@@ -175,7 +175,7 @@ button.btn-info:hover {
       <h5 id="robot-status" style="margin-right: 10px;">Waiting for updates...</h5>
       <h5>Battery: <span id="battery-percentage">--%</span></h5>
     </div>
-  </div>
+  </div>   <!-- Front and back camera view visuals -->
 <div class="container-fluid mt-3">
   <div class="row">
     <div class="col-md-6">
@@ -188,11 +188,11 @@ button.btn-info:hover {
     <div class="col-md-6">
       <div class="video-feed">
         <h5 class="text-center">Back Camera</h5>
-        <!-- <img src="{{ url_for('static', filename='Back_cam.png') }}" alt="Back Camera Feed"/> -->
+        <!-- <img src="{{ url_for('static', filename='Back_cam.png') }}" alt="Back Camera Feed"/> Only for use with no camera feed (placeholder)-->
         <img src="{{ url_for('video_feed_back') }}" alt="back Camera Feed"/>
       </div>
     </div>
-  </div>
+  </div>   <!-- GPS map visuals -->
   <div class="row mt-3">
     <div class="col-md-8">
       <div class="map p-2">
@@ -201,7 +201,7 @@ button.btn-info:hover {
       </div>
     </div>
     <div class="col-md-4">
-      <div class="button-box">
+      <div class="button-box">   <!-- Button layout visuals -->
         <form action="/run_lidar" method="get">
           <button class="btn btn-primary btn-block mb-2" type="submit">Initialize LiDAR</button>
         </form>
@@ -355,21 +355,20 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
       console.log("Loaded geofence data:", data);
 
       if (data.geofence && Array.isArray(data.geofence)) {
-        // Clear existing polygon/markers if needed
+        // Clear existing box and markers
         if (geofencePolygon) {
           map.removeLayer(geofencePolygon);
         }
         geofenceMarkers.forEach(marker => map.removeLayer(marker));
         geofenceMarkers = [];
 
-        // Draw markers and polygon
+        // Draw markers and box from file data
         geofencePolygon = L.polygon(data.geofence, { color: 'red' }).addTo(map);
         data.geofence.forEach(point => {
           const marker = L.marker(point, { icon: geofenceIcon }).addTo(map);
           geofenceMarkers.push(marker);
         });
 
-        // Optional: zoom to fit the geofence
         map.fitBounds(geofencePolygon.getBounds());
       } else {
         console.warn("Invalid geofence data format");
